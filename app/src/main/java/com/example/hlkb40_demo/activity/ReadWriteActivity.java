@@ -1,5 +1,39 @@
 package com.example.hlkb40_demo.activity;
 
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.Dialog;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattDescriptor;
+import android.bluetooth.BluetoothGattService;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.content.SharedPreferences.Editor;
+import android.os.Bundle;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Message;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.RadioGroup.OnCheckedChangeListener;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.example.hlkb40_demo.AdapterManager;
+import com.example.hlkb40_demo.BluetoothApplication;
+import com.example.hlkb40_demo.BluetoothLeClass;
+import com.example.hlkb40_demo.R;
+import com.example.hlkb40_demo.WriterOperation;
+import com.example.hlkb40_demo.utilInfo.Utils;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -10,48 +44,6 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
-import com.example.hlkb40_demo.AdapterManager;
-import com.example.hlkb40_demo.BluetoothApplication;
-import com.example.hlkb40_demo.BluetoothLeClass;
-import com.example.hlkb40_demo.R;
-import com.example.hlkb40_demo.activity.DeviceScanActivity;
-import com.example.hlkb40_demo.activity.SelectFileActivity;
-import com.example.hlkb40_demo.utilInfo.Utils;
-import com.example.hlkb40_demo.WriterOperation;
-
-import android.annotation.SuppressLint;
-import android.app.Activity;
-import android.app.Dialog;
-import android.bluetooth.BluetoothGattCharacteristic;
-import android.bluetooth.BluetoothGattDescriptor;
-import android.bluetooth.BluetoothGattService;
-
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.content.SharedPreferences.Editor;
-
-import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-
-import android.os.Message;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.View.OnClickListener;
-
-import android.widget.Button;
-import android.widget.EditText;
-
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
-import android.widget.TextView;
-import android.widget.Toast;
-
-import android.widget.RadioGroup.OnCheckedChangeListener;
 
 @SuppressLint("ShowToast")
 public class ReadWriteActivity extends Activity implements
@@ -532,57 +524,68 @@ public class ReadWriteActivity extends Activity implements
 
 	class ConnectedThread extends Thread {
 
-		private long wait;
-		private Thread thread;
-		public ConnectedThread() {
-			isRecording = false;
-			this.wait = 10;
-			thread = new Thread(new ReadRunnable());
-		}
-		public void Stop() {
-			isRecording = false;
-		}
-		public void Start() {
-			isRecording = true;
-			State aa = thread.getState();
-			if (aa == State.NEW) {
-				thread.start();
-			} else
-				thread.resume();
-		}
-		private class ReadRunnable implements Runnable {
-			public void run() {
-				byte[] recv = null;
-				int len = 0;
-				while (isRecording) {		
-						try {
-							// System.out.println("totle " + totle );
-							recv = readgattCharacteristic.getValue();
-							if (recv.length > 0) {
-								
+        private long wait;
+        private final Thread thread;
+        private final Object threadLock = new Object(); // 1. 新增一個鎖物件
+        // isRecording 變數建議宣告為 volatile
+        private volatile boolean isRecording = false;
 
-							 mHandler.sendEmptyMessage(9);
-							 /*byte[] btBuf = new byte[10];
-								System.arraycopy(recv, 0, btBuf, 0, recv.length);
+        public ConnectedThread() {
+            this.wait = 10;
+            thread = new Thread(new ReadRunnable());
+        }
 
-								readStr1 = new String(btBuf, encodeType);
-								//System.out.println("readstr " + readStr1);
-								mHandler.obtainMessage(01, len, -1, readStr1)
-										.sendToTarget();
-							  */
-//							 mHandler.obtainMessage(01, len, -1, recv)
-//								.sendToTarget();
-							}
-							Thread.sleep(wait);
-						} catch (Exception e) {
-							// TODO Auto-generated catch block
-						
+        public void Stop() {
+            isRecording = false;
+            // 如果執行緒正在等待，喚醒它讓它能結束迴圈
+            synchronized (threadLock) {
+                threadLock.notifyAll();
+            }
+        }
 
-					}
+        public void Start() {
+            isRecording = true;
+            Thread.State aa = thread.getState();
+            if (aa == Thread.State.NEW) {
+                thread.start();
+            } else {
+                synchronized (threadLock) {
+                    threadLock.notifyAll();
+                }
+            }
+        }
+        private class ReadRunnable implements Runnable {
+            public void run() {
+                while (true) {
+                    synchronized (threadLock) {
+                        if (!isRecording) {
+                            try {
+                                threadLock.wait();
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                break;
+                            }
+                        }
+                    }
+                    if (!isRecording) {
+                        break;
+                    }
 
-				}
-			}
-		}
+                    try {
+                        byte[] recv = readgattCharacteristic.getValue();
+                        if (recv != null && recv.length > 0) {
+                            mHandler.sendEmptyMessage(9);
+                        }
+                        Thread.sleep(wait);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
 	}
 
 	private class MyHandler extends Handler {
