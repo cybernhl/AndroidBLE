@@ -2,37 +2,51 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED"
-        tools:ignore="ProtectedPermissions" />
+    <!-- 移除了 BLUETOOTH_PRIVILEGED 因為它通常只適用於系統應用 -->
+    <!-- <uses-permission android:name="android.permission.BLUETOOTH_PRIVILEGED" tools:ignore="ProtectedPermissions" /> -->
+
+    <!-- 舊的存儲權限，如果您的 targetSdk < 29，可能還需要 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE "
-        tools:ignore="SystemPermissionTypo" />
-    <uses-permission android:name="android.permission.MOUNT_UNMOUNT_FILESYSTEMS"
-        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+
+    <!-- 網路權限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!--蓝牙权限-->
+
+    <!-- === 權限修改 START === -->
+
+    <!-- 舊版藍牙權限 (API 30 及以下) -->
+    <!-- 為 BLUETOOTH 和 BLUETOOTH_ADMIN 添加 maxSdkVersion="30" 是正確的，因為它們在新版中被取代了 -->
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
-    <!--Android6以上 动态申请位置权限-->
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- 定位權限 -->
+    <!-- 移除了 maxSdkVersion="30"，讓它在所有 Android 版本上都有效 -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!--Android12以上 申请蓝牙扫描，连接，广播权限-->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- 新版藍牙權限 (Android 12 / API 31 及以上) -->
+    <!-- 這些權限只在新版系統上存在，所以不需要 maxSdkVersion -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!--使用蓝牙低功耗BLE-->
-    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+
+    <!-- === 權限修改 END === -->
+
+
+    <!-- 聲明 App 需要 BLE 功能 -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="true"/>
 
 
     <application
         android:name="BluetoothApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
+        android.fullBackupContent="@xml/backup_rules"
         android:icon="@drawable/img_app_logo"
         android:label="@string/app_name"
         android:requestLegacyExternalStorage="true"
